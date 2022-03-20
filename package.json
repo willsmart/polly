@@ -1,0 +1,16 @@
+{
+  "name": "polly",
+  "version": "1.0.0",
+  "description": "",
+  "main": "area.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "cli-progress": "^3.10.0",
+    "node-fetch": "~2",
+    "odrive": "file:../3rd/odrive"
+  }
+}
