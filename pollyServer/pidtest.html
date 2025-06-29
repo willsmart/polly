@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Polly \o/</title>
+  </head>
+  <body>
+    <h2>PID test</h2>
+    <p id="data"></p>
+    <input
+      type="range"
+      id="limit"
+      step="any"
+      min="20"
+      max="0"
+      value="10"
+      style="width: 90vw"
+      list="limitlist"
+    />
+    <datalist id="limitlist">
+      <option>0</option>
+      <option>5</option>
+      <option>10</option>
+      <option>15</option>
+      <option>20</option>
+    </datalist>
+    <br />
+    <input
+      type="range"
+      id="gain"
+      step="any"
+      min="-10"
+      max="10"
+      value="1"
+      style="width: 90vw"
+      list="gainlist"
+    />
+    <datalist id="gainlist">
+      <option>-10</option>
+      <option>-5</option>
+      <option>0</option>
+      <option>5</option>
+      <option>10</option>
+    </datalist>
+    <br />
+    <input
+      type="range"
+      id="prop"
+      step="any"
+      min="-5"
+      max="5"
+      value="1"
+      style="width: 90vw"
+      list="proplist"
+    />
+    <datalist id="proplist">
+      <option>-5</option>
+      <option>-2</option>
+      <option>0</option>
+      <option>2</option>
+      <option>5</option>
+    </datalist>
+    <br />
+    <input
+      type="range"
+      id="integral"
+      step="any"
+      min="-0.5"
+      max="0.5"
+      value="0.1"
+      style="width: 90vw"
+      list="integrallist"
+    />
+    <datalist id="integrallist">
+      <option>-0.5</option>
+      <option>-0.25</option>
+      <option>0</option>
+      <option>0.25</option>
+      <option>0.5</option>
+    </datalist>
+    <br />
+    <input
+      type="range"
+      id="deriv"
+      step="any"
+      min="-0.25"
+      max="0.25"
+      value="0.1"
+      style="width: 90vw"
+      list="derivlist"
+    />
+    <datalist id="derivlist">
+      <option>-0.25</option>
+      <option>-0.125</option>
+      <option>0</option>
+      <option>0.125</option>
+      <option>0.25</option>
+    </datalist>
+    <br />
+    <svg
+      viewBox="-60 -60 120 120"
+      xmlns="http://www.w3.org/2000/svg"
+      style="border: 1px solid black; width: 60vw; height: 60vw"
+    >
+      <path
+        d="SVG_PATH"
+        stroke="blue"
+        stroke-width="2"
+        fill="none"
+        id="path"
+        style="stroke-dasharray: 50, 100000000; stroke-dashoffset: var(--at)"
+      ></path>
+      <path
+        d="SVG_PATH"
+        stroke="black"
+        stroke-width="1"
+        fill="none"
+        id="path"
+      ></path>
+      <circle id="circle" cx="0" cy="0" r="2" fill="red" />
+      <circle id="pointer-circle" cx="0" cy="0" r="2" stroke="green" />
+    </svg>
+  </body>
+
+  <script src="polly-client.js"></script>
+  <script src="pid.js"></script>
+
+  <script>
+    var gainEl = document.getElementById("gain");
+    var propEl = document.getElementById("prop");
+    var derivEl = document.getElementById("deriv");
+    var integralEl = document.getElementById("integral");
+    var svgEl = document.querySelector("svg");
+    var pointerCircleEl = document.getElementById("pointer-circle");
+
+    svgEl.addEventListener("mousedown", (e) => {
+      const { offsetX, offsetY } = e,
+        { clientWidth, clientHeight } = svgEl,
+        { x: vbx, y: vby, width: vbw, height: vbh } = svgEl.viewBox.baseVal;
+      vtarget = {
+        x: (offsetX / clientWidth) * vbw + vbx,
+        y: (offsetY / clientHeight) * vbh + vby,
+      };
+      console.log(vtarget);
+    });
+
+    const vpid = { x: new PID(1, 0.1, 0.05, 1), y: new PID(1, 0.1, 0.05, 1) };
+    function updatePid() {
+      vpid.x.kp = vpid.y.kp = propEl.value;
+      vpid.x.ki = vpid.y.ki = integralEl.value;
+      vpid.x.kd = vpid.y.kd = derivEl.value;
+    }
+
+    (function slowLoop() {
+      setTimeout(async () => {
+        try {
+          await slowTick();
+        } catch (e) {
+          console.error(e);
+        }
+        slowLoop();
+      }, 200);
+    })();
+    (function fastLoop() {
+      setTimeout(async () => {
+        try {
+          await fastTick();
+        } catch (e) {
+          console.error(e);
+        }
+        fastLoop();
+      }, 10);
+    })();
+
+    const differentNumbers = (a, b) => Math.abs((a ?? 0) - (b ?? 0)) > 0.01;
+
+    let vtarget = { x: 0, y: 0 };
+
+    async function slowTick() {
+      const vrobot = {
+          x: robotStateObj?.x?.position || 0,
+          y: robotStateObj?.y?.position || 0,
+        },
+        verror = { x: vrobot.x - vtarget.x, y: vrobot.y - vtarget.y },
+        vdrive = { x: vpid.x.update(verror.x), y: vpid.y.update(verror.y) },
+        gain = gainEl.value;
+
+      goalState.x.position(vtarget.x, vdrive.x * gain);
+      goalState.y.position(vtarget.y, vdrive.y * gain);
+    }
+
+    async function fastTick() {
+      updatePollyPos();
+    }
+
+    function updatePollyPos() {
+      pointerCircleEl.setAttribute("cx", robotStateObj?.x?.position ?? 0);
+      pointerCircleEl.setAttribute("cy", robotStateObj?.y?.position ?? 0);
+    }
+  </script>
+</html>

@@ -2,33 +2,27 @@ const { odrive, od: odPromise } = require("./odrive");
 
 const KV = 190;
 
-module.exports = async function ({ recal, isy }) {
+module.exports = async function (recal = false) {
   await odrive.readyPromise;
   const od = (this.od = await odPromise);
 
   this.getAxis = (axisi) => od[`axis${axisi}`];
 
-  od.axis0.requested_state = 1;
-  od.axis1.requested_state = 1;
-  await odrive.readyPromise;
-
   this.goBase = async () => {
     oc = od.config;
 
-    //  oc.enable_brake_resistor = true
-    oc.enable_brake_resistor = true;
-    oc.brake_resistance = 2;
-    oc.max_regen_current = 0;
-    oc.dc_max_negative_current = -0.02;
+    oc.enable_brake_resistor = false;
+    oc.brake_resistance = 0;
+    oc.max_regen_current = 0.0;
+    oc.dc_max_negative_current = -0.1;
+    oc.gpio1_mode = odrive.GPIO_MODE_DIGITAL_PULL_UP;
     oc.gpio2_mode = odrive.GPIO_MODE_DIGITAL_PULL_UP;
-    oc.gpio4_mode = odrive.GPIO_MODE_DIGITAL_PULL_UP;
 
     await odrive.readyPromise;
   };
 
   this.goAxis = async (axisi) => {
     axis = getAxis(axisi);
-
     ac = axis.config;
     mc = axis.motor.config;
     cc = axis.controller.config;
@@ -36,56 +30,37 @@ module.exports = async function ({ recal, isy }) {
     tc = axis.trap_traj.config;
 
     ac.startup_encoder_index_search = true;
-    ac.startup_homing = true;
 
-    ec.cpr = isy && axisi == 0 ? 8192 : 4096;
+    ec.cpr = 2048 * 4; //4096
     ec.use_index = true;
-    ec.direction = -1;
 
-    mc.current_lim = 30;
-    mc.calibration_current = 10;
+    mc.current_lim = 5;
+    mc.calibration_current = 2;
     mc.pole_pairs = 7;
     mc.torque_constant = 8.27 / KV;
     mc.motor_type = odrive.MOTOR_TYPE_HIGH_CURRENT;
 
-    cc.vel_limit = 60;
+    cc.vel_limit = 10;
     cc.control_mode = odrive.CONTROL_MODE_POSITION_CONTROL;
     cc.input_mode = odrive.INPUT_MODE_TRAP_TRAJ;
-    cc.homing_speed = 4;
+    cc.homing_speed = 0.5;
 
-    many = async (n, f) => {
-      for (let i = n; i > 0; i--)
-        await new Promise((r) =>
-          setTimeout(() => {
-            try {
-              f();
-            } catch (err) {
-              console.error(err.message);
-              i = 0;
-            }
-            console.log(".");
-            r();
-          }, 100)
-        );
-    };
+    tc.accel_limit = 5;
+    tc.decel_limit = 5;
+    tc.vel_limit = 5.0;
 
-    tc.accel_limit = 40;
-    tc.decel_limit = 40;
-    tc.vel_limit = 40.0;
-
-    axis.min_endstop.config.is_active_high = true;
-    // axis.min_endstop.config.pullup = true;
+    axis.min_endstop.config.is_active_high = false;
+    axis.min_endstop.config.pullup = true;
     axis.min_endstop.config.offset = 0.5;
     axis.min_endstop.config.enabled = true;
-    axis.min_endstop.config.gpio_num = axisi * 2 + 2;
+    axis.min_endstop.config.gpio_num = axisi + 3;
     axis.max_endstop.config.enabled = false;
 
     await odrive.readyPromise;
   };
 
   await this.goBase();
-  if (isy) await this.goAxis(0);
-  await this.goAxis(1);
+  await this.goAxis(0);
 
   this.calAxis = async (axisi) => {
     axis = getAxis(axisi);
@@ -96,6 +71,7 @@ module.exports = async function ({ recal, isy }) {
       ec.pre_calibrated = false;
       mc.pre_calibrated = false;
       await odrive.readyPromise;
+      od.save_configuration();
 
       console.log(
         "   - have marked the axis as needing calibration. Please power cycle the odrive and rerun the script.\n"
@@ -109,8 +85,6 @@ module.exports = async function ({ recal, isy }) {
       !recal
     ) {
       console.log(`Group ${axisi} is already calibrated`);
-      await axis.requested_state__set(odrive.AXIS_STATE_IDLE);
-
       return;
     }
 
@@ -142,12 +116,10 @@ module.exports = async function ({ recal, isy }) {
 
     console.log("   - done.\n");
 
-    await axis.requested_state__set(odrive.AXIS_STATE_IDLE);
     await odrive.readyPromise;
   };
 
-  if (isy) await this.calAxis(0);
-  await this.calAxis(1);
+  // await this.calAxis(0);
 
   await od.save_configuration();
 

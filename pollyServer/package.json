@@ -1,0 +1,18 @@
+{
+  "name": "pollyserver",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "s": "node main.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@koa/router": "^13.1.0",
+    "koa": "^2.16.0",
+    "koa-websocket": "^7.0.0",
+    "serialport": "^13.0.0"
+  }
+}

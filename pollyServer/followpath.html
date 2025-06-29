@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Polly \o/</title>
+  </head>
+  <body>
+    <h2>Um,... I guess this is Polly,.... finally</h2>
+    <p id="data"></p>
+    <input
+      type="range"
+      id="speed"
+      step="any"
+      min="-20"
+      max="20"
+      value="0"
+      style="width: 90vw"
+    />
+    <br />
+    <input
+      type="range"
+      id="at"
+      step="any"
+      min="0"
+      max="1"
+      value="0"
+      style="width: 90vw"
+      disabled
+    />
+    <br />
+    <svg
+      viewBox="-60 -60 120 120"
+      xmlns="http://www.w3.org/2000/svg"
+      style="border: 1px solid black; width: 60vw; height: 60vw"
+    >
+      <path
+        d="SVG_PATH"
+        stroke="blue"
+        stroke-width="2"
+        fill="none"
+        id="path"
+        style="stroke-dasharray: 50, 100000000; stroke-dashoffset: var(--at)"
+      ></path>
+      <path
+        d="SVG_PATH"
+        stroke="black"
+        stroke-width="1"
+        fill="none"
+        id="path"
+      ></path>
+      <circle id="circle" cx="0" cy="0" r="2" fill="red" />
+      <circle id="pointer-circle" cx="0" cy="0" r="2" stroke="green" />
+    </svg>
+  </body>
+
+  <script src="polly-client.js"></script>
+  <script src="pid.js"></script>
+
+  <script>
+    const pid = new PID(1, 0.1, 0.05, 1);
+    var followFrac = pid.update(0),
+      distFromLine = 0;
+
+    var atEl = document.getElementById("at");
+    var speedEl = document.getElementById("speed");
+    var pathEl = document.getElementById("path");
+    var circleEl = document.getElementById("circle");
+    var svgEl = document.querySelector("svg");
+    var pointerCircleEl = document.getElementById("pointer-circle");
+
+    (function slowLoop() {
+      setTimeout(async () => {
+        try {
+          await slowTick();
+        } catch (e) {
+          console.error(e);
+        }
+        slowLoop();
+      }, 200);
+    })();
+
+    const differentNumbers = (a, b) => Math.abs((a ?? 0) - (b ?? 0)) > 0.01;
+
+    let sentGoal = { p0: {}, dp: {} };
+    async function slowTick() {
+      const f0 = pathEl.getTotalLength() * (atEl.value || 0),
+        p0 = pathEl.getPointAtLength(f0),
+        pr = {
+          x: robotStateObj?.x?.position || 0,
+          y: robotStateObj?.y?.position || 0,
+        };
+
+      let p1,
+        f1 = f0,
+        dp,
+        __derivLength;
+      do {
+        f1 += 0.1;
+        p1 = pathEl.getPointAtLength(f1);
+        const sqdistFromLine =
+          (p1.x - p0.x) * (pr.y - p0.y) - (p1.y - p0.y) * (pr.x - p0.x);
+        distFromLine =
+          Math.sign(sqdistFromLine) * Math.sqrt(Math.abs(sqdistFromLine));
+        followFrac = pid.update(distFromLine);
+        console.log({ distFromLine, followFrac });
+        const frac = window.frac ?? followFrac;
+        dp = {
+          x: p1.x - p0.x + frac * (p0.x - pr.x),
+          y: p1.y - p0.y + frac * (p0.y - pr.y),
+        };
+        __derivLength = Math.sqrt(dp.x ** 2 + dp.y ** 2);
+      } while (f1 < pathEl.getTotalLength() && __derivLength < 0.1);
+      const speed = speedEl.value || 0;
+      if (!differentNumbers(speed, 0)) return;
+      dp.x *= speed / __derivLength;
+      dp.y *= speed / __derivLength;
+      if (!(isFinite(dp.x) && isFinite(dp.y))) {
+        dp = { x: 0, y: 0 };
+      }
+
+      if (
+        differentNumbers(p0.x, sentGoal.p0.x) ||
+        differentNumbers(p0.y, sentGoal.p0.y) ||
+        differentNumbers(dp.x, sentGoal.dp.x) ||
+        differentNumbers(dp.y, sentGoal.dp.y)
+      ) {
+        goalState.x.position(p0.x, dp.x);
+        goalState.y.position(p0.y, dp.y);
+        sentGoal.p0 = p0;
+        sentGoal.dp = dp;
+      }
+
+      // const res = await fetch(
+      //   `http://localhost:3000/tick?xpos=${p0.x}&ypos=${p0.y}&xvel=${dp.x}&yvel=${dp.y}`,
+      //   {
+      //     method: "GET",
+      //     headers: {
+      //       Accept: "application/json",
+      //     },
+      //   }
+      // );
+      // const data = await res.json();
+      // document.getElementById("data").innerText = JSON.stringify(data, null, 2);
+      // if (data?.x?.position != null && data?.y?.position != null) {
+      //   pointerCircleEl.setAttribute("cx", data.x.position);
+      //   pointerCircleEl.setAttribute("cy", data.y.position);
+      // }
+    }
+
+    (function fastLoop() {
+      setTimeout(async () => {
+        try {
+          await fastTick();
+        } catch (e) {
+          console.error(e);
+        }
+        fastLoop();
+      }, 10);
+    })();
+    async function fastTick() {
+      updatePollyPos();
+    }
+
+    atEl.addEventListener("input", function ({ target: { value } }) {
+      const at = pathEl.getTotalLength() * value;
+      const pt = pathEl.getPointAtLength(at);
+      pathEl.style.strokeDashoffset = -at;
+      circleEl.setAttribute("cx", pt.x);
+      circleEl.setAttribute("cy", pt.y);
+    });
+
+    // svgEl.addEventListener("mousemove", function ({ clientX, clientY }) {
+    //   const pt = svgEl.createSVGPoint();
+    //   pt.x = clientX;
+    //   pt.y = clientY;
+    //   const msp = pt.matrixTransform(svgEl.getScreenCTM().inverse());
+    //   pointerCircleEl.setAttribute("cx", msp.x);
+    //   pointerCircleEl.setAttribute("cy", msp.y);
+    // });
+
+    function updatePollyPos() {
+      pointerCircleEl.setAttribute("cx", robotStateObj?.x?.position ?? 0);
+      pointerCircleEl.setAttribute("cy", robotStateObj?.y?.position ?? 0);
+
+      const msp = {
+        x: pointerCircleEl.getAttribute("cx"),
+        y: pointerCircleEl.getAttribute("cy"),
+      };
+      const f0 = pathEl.getTotalLength() * (atEl.value || 0),
+        p0 = pathEl.getPointAtLength(f0);
+      let p1,
+        f1 = f0,
+        dp,
+        __derivLength;
+      do {
+        f1 += 0.1;
+        p1 = pathEl.getPointAtLength(f1);
+        dp = { x: p1.x - p0.x, y: p1.y - p0.y };
+        __derivLength = Math.sqrt(dp.x ** 2 + dp.y ** 2);
+      } while (f1 < pathEl.getTotalLength() && __derivLength < 0.1);
+      dp.x /= __derivLength;
+      dp.y /= __derivLength;
+
+      let df = dp.x * (msp.x - p0.x) + dp.y * (msp.y - p0.y);
+      df = Math.min(Math.max(df, -1), 1);
+      // console.log({ f0, p0, f1, p1, dp, df });
+      if (df) {
+        atEl.value = (f0 + df) / pathEl.getTotalLength();
+        atEl.dispatchEvent(new Event("input"));
+      }
+    }
+  </script>
+</html>

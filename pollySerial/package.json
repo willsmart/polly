@@ -1,17 +1,14 @@
 {
-  "name": "polly",
+  "name": "pollySerial",
   "version": "1.0.0",
   "description": "",
-  "main": "area.js",
+  "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "cli-progress": "^3.10.0",
-    "koa": "^2.16.0",
-    "node-fetch": "~2",
-    "odrive": "file:../odrive-base"
+    "serialport": "^13.0.0"
   }
 }

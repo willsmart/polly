@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Polly \o/</title>
+    <style>
+      em {
+        font-style: normal;
+        font-weight: bold;
+        color: indianred;
+      }
+    </style>
+  </head>
+  <body>
+    <h2>
+      Um,... I guess this is Polly,.... finally -- The page with utility buttons
+    </h2>
+    <button onclick="getInfo()">Refresh info</button>
+    <button onclick="home()">Home</button>
+    <button onclick="markashomed()">Mark as homed</button>
+    <button onclick="idle()">Idle</button>
+    <button onclick="engage()">Engage</button>
+    <button onclick="calibrate()">Calibrate motors</button>
+    <button onclick="clearErrors()">Clear errors</button>
+    <br />
+    <svg
+      viewBox="-250 -250 500 500"
+      xmlns="http://www.w3.org/2000/svg"
+      style="border: 1px solid black; width: 60vw; height: 60vw; float: left"
+    >
+      <circle id="pointer-circle" cx="0" cy="0" r="2" stroke="green" />
+      <circle
+        id="pointer-bcircle"
+        cx="0"
+        cy="0"
+        r="4"
+        stroke="red"
+        stroke-width="1"
+        fill="transparent"
+      />
+    </svg>
+    <h4 style="margin-bottom: 0; margin-top: 0">X axis</h4>
+    <p
+      id="xdata"
+      style="
+        margin-left: 10px;
+        margin-top: 0;
+        margin-bottom: 0.7rem;
+        width: 30vw;
+        display: inline-block;
+        font-size: small;
+        white-space: pre-wrap;
+      "
+    ></p>
+    <h4 style="margin-bottom: 0; margin-top: 0">Y axis</h4>
+    <p
+      id="ydata"
+      style="
+        margin-left: 10px;
+        margin-top: 0;
+        margin-bottom: 0.7rem;
+        width: 30vw;
+        display: inline-block;
+        font-size: small;
+        white-space: pre-wrap;
+      "
+    ></p>
+    <h6 style="margin-bottom: 0; margin-top: 0">X follower axis</h6>
+    <p
+      id="xbdata"
+      style="
+        margin-left: 10px;
+        margin-top: 0;
+        margin-bottom: 0.5rem;
+        width: 30vw;
+        display: inline-block;
+        font-size: xx-small;
+        white-space: pre-wrap;
+      "
+    ></p>
+    <h6 style="margin-bottom: 0; margin-top: 0">Y follower axis</h6>
+    <p
+      id="ybdata"
+      style="
+        margin-left: 10px;
+        margin-top: 0;
+        margin-bottom: 0;
+        width: 30vw;
+        display: inline-block;
+        font-size: xx-small;
+        white-space: pre-wrap;
+      "
+    ></p>
+  </body>
+
+  <script src="polly-client.js"></script>
+
+  <script>
+    var svgEl = document.querySelector("svg");
+    var dataEl = {
+      x: document.querySelector("#xdata"),
+      y: document.querySelector("#ydata"),
+      xb: document.querySelector("#xbdata"),
+      yb: document.querySelector("#ybdata"),
+    };
+    var pointerCircleEl = document.getElementById("pointer-circle");
+    var pointerbCircleEl = document.getElementById("pointer-bcircle");
+
+    robotStateObjListeners.push((axis, key, value) => {
+      if (axis == "x" || axis == "y" || axis == "xb" || axis == "yb") {
+        dataEl[axis].innerHTML = [...Object.entries(robotStateObj[axis])]
+          .flatMap(([k, v]) =>
+            (k == "error" && !v) || k == "trajDone" || k == "procResult"
+              ? []
+              : [k == "error" ? `<em>${k}: ${v}</em>` : `${k}: ${v}`]
+          )
+          .join("<br>");
+        if (key == "position")
+          (axis == "x" || axis == "y"
+            ? pointerCircleEl
+            : pointerbCircleEl
+          ).setAttribute("c" + axis.substring(0, 1), value ?? 0);
+      }
+    });
+
+    function home() {
+      goalState.x.command.home();
+      goalState.y.command.home();
+    }
+
+    function markashomed() {
+      goalState.x.homedFlag_force = goalState.y.homedFlag_force = 1;
+    }
+
+    function calibrate() {
+      goalState.x.state = goalState.y.state = 3;
+    }
+
+    function idle() {
+      goalState.x.state = goalState.y.state = 1;
+    }
+
+    function engage() {
+      goalState.x.state = goalState.y.state = 8;
+    }
+
+    function getInfo() {
+      goalState.x.request.info();
+      goalState.y.request.info();
+      goalState.xb.request.info();
+      goalState.yb.request.info();
+    }
+
+    function clearErrors() {
+      goalState.x.command.clearErrors();
+      goalState.y.command.clearErrors();
+      goalState.xb.command.clearErrors();
+      goalState.yb.command.clearErrors();
+    }
+  </script>
+</html>

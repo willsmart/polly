@@ -1,0 +1,6 @@
+wsl --distribution wsl2-usbip --user will --cd /home/will/mycode/polly
+usbipd wsl list
+usbipd wsl attach --busid 4-4 --distribution wsl2-usbip
+node go.js
+
+many=async (n,f,per=100)=>{for (let i = n;i>0;i--) await new Promise(r=>setTimeout(async()=>{try {console.log(await (f?.()));}catch (err){console.error(err.message);i = 0;}r();},per));}
